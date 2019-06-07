@@ -7,6 +7,8 @@ import Welcome from './Welcome';
 import 'bootstrap/dist/css/bootstrap.css';
 import config from './Config';
 import { UserAgentApplication } from 'msal';
+import { getUserDetails } from './GraphService';
+import Calendar from './Calendar';
 
 class App extends Component {
   constructor(props) {
@@ -34,23 +36,40 @@ class App extends Component {
       // If the cache contains a non-expired token, this function
       // will just return the cached token. Otherwise, it will
       // make a request to the Azure OAuth endpoint to get a token
-  
+
       var accessToken = await this.userAgentApplication.acquireTokenSilent(config.scopes);
-  
+
       if (accessToken) {
-        // TEMPORARY: Display the token in the error flash
+        // Get the user's profile from Graph
+        var user = await getUserDetails(accessToken);
         this.setState({
           isAuthenticated: true,
-          error: { message: "Access token:", debug: accessToken }
+          user: {
+            displayName: user.displayName,
+            email: user.mail || user.userPrincipalName
+          },
+          error: null
         });
       }
     }
-    catch(err) {
-      var errParts = err.split('|');
+    catch (err) {
+      var error = {};
+      if (typeof (err) === 'string') {
+        var errParts = err.split('|');
+        error = errParts.length > 1 ?
+          { message: errParts[1], debug: errParts[0] } :
+          { message: err };
+      } else {
+        error = {
+          message: err.message,
+          debug: JSON.stringify(err)
+        };
+      }
+
       this.setState({
         isAuthenticated: false,
         user: {},
-        error: { message: errParts[1], debug: errParts[0] }
+        error: error
       });
     }
   }
@@ -95,6 +114,11 @@ class App extends Component {
                   isAuthenticated={this.state.isAuthenticated}
                   user={this.state.user}
                   authButtonMethod={this.login.bind(this)} />
+              } />
+            <Route exact path="/calendar"
+              render={(props) =>
+                <Calendar {...props}
+                  showError={this.setErrorMessage.bind(this)} />
               } />
           </Container>
         </div>
